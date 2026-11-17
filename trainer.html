@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ByronFit — Panel de entrenador</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="trainer-body">
+
+<div class="trainer-layout">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <img src="ByronFit.png" alt="ByronFit" style="height:72px;width:auto;object-fit:contain;" />
+    </div>
+    <ul class="nav-links">
+      <li><button class="nav-item active" data-view="dashboard">Dashboard</button></li>
+      <li><button class="nav-item" data-view="clients">Clientes</button></li>
+      <li><button class="nav-item" data-view="builder">Crear entrenamiento</button></li>
+      <li><button class="nav-item" data-view="workouts">Biblioteca</button></li>
+      <li><button class="nav-item" data-view="assignments">Asignaciones</button></li>
+      <li><button class="nav-item" data-view="ai">Asistente IA</button></li>
+    </ul>
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar" id="trainer-avatar">B</div>
+        <div>
+          <div class="user-name" id="trainer-name">Entrenador</div>
+          <button class="logout-btn" id="logout-btn">Cerrar sesión</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main-content">
+    <section class="view active" id="view-dashboard"></section>
+    <section class="view" id="view-clients"></section>
+    <section class="view" id="view-builder"></section>
+    <section class="view" id="view-workouts"></section>
+    <section class="view" id="view-assignments"></section>
+    <section class="view" id="view-ai"></section>
+  </main>
+</div>
+
+<!-- Modals -->
+<div id="modal-add-client" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('modal-add-client')">x</button>
+    <div class="modal-title">Nuevo cliente</div>
+    <form id="form-add-client" onsubmit="saveClient(event)">
+      <div class="form-group"><label>Nombre completo</label><input type="text" id="ac-name" required placeholder="Nombre del cliente" /></div>
+      <div class="form-group"><label>Email</label><input type="email" id="ac-email" required placeholder="email@ejemplo.com" /></div>
+      <div class="form-group"><label>Objetivo</label>
+        <select id="ac-goal">
+          <option value="hipertrofia">Hipertrofia muscular</option>
+          <option value="perdida">Pérdida de grasa</option>
+          <option value="fuerza">Fuerza máxima</option>
+          <option value="running">Running / resistencia</option>
+          <option value="ciclismo">Ciclismo</option>
+          <option value="salud">Salud general</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Notas iniciales</label><textarea id="ac-notes" placeholder="Lesiones, limitaciones, historial..."></textarea></div>
+      <button type="submit" class="btn btn-primary" style="width:100%">Añadir cliente</button>
+    </form>
+  </div>
+</div>
+
+<div id="modal-assign" class="modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('modal-assign')">x</button>
+    <div class="modal-title">Asignar entrenamiento</div>
+    <form id="form-assign" onsubmit="saveAssignment(event)">
+      <div class="form-group"><label>Cliente</label><select id="assign-client" required></select></div>
+      <div class="form-group"><label>Fecha</label><input type="date" id="assign-date" required /></div>
+      <div class="form-group"><label>Notas para el cliente</label><textarea id="assign-notes" placeholder="Instrucciones específicas..."></textarea></div>
+      <input type="hidden" id="assign-workout-id" />
+      <button type="submit" class="btn btn-primary" style="width:100%">Asignar</button>
+    </form>
+  </div>
+</div>
+
+<div id="modal-workout-detail" class="modal">
+  <div class="modal-box wide">
+    <button class="modal-close" onclick="closeModal('modal-workout-detail')">x</button>
+    <div id="workout-detail-content"></div>
+  </div>
+</div>
+
+<div id="modal-client-detail" class="modal">
+  <div class="modal-box wide">
+    <button class="modal-close" onclick="closeModal('modal-client-detail')">x</button>
+    <div id="client-detail-content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script src="trainer.js"></script>
+</body>
+</html>
