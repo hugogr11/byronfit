@@ -84,10 +84,12 @@ async function loadDashboard() {
 
   const [clientsSnap, assignSnap] = await Promise.all([
     db.collection('clients').where('trainerId', '==', S.user.uid).get(),
-    db.collection('assignments').where('trainerId', '==', S.user.uid).orderBy('createdAt', 'desc').limit(8).get(),
+    db.collection('assignments').where('trainerId', '==', S.user.uid).get(),
   ]);
   const clients     = clientsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-  const assignments = assignSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const assignments = assignSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+    .slice(0, 8);
   const done = assignments.filter(a => a.status === 'done').length;
 
   wrap.innerHTML = `
@@ -235,8 +237,9 @@ async function openClientDetail(clientId, docId) {
   if (clientData.clientId) {
     assignSnap = await db.collection('assignments')
       .where('trainerId', '==', S.user.uid)
-      .where('clientId', '==', clientData.clientId)
-      .orderBy('scheduledDate', 'desc').limit(10).get();
+      .where('clientId', '==', clientData.clientId).get();
+    assignSnap = { docs: assignSnap.docs.sort((a, b) =>
+      (b.data().scheduledDate || '').localeCompare(a.data().scheduledDate || '')).slice(0, 10) };
   } else { assignSnap = { docs: [] }; }
 
   const assigns = assignSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -534,8 +537,9 @@ async function saveWorkout() {
 async function loadWorkouts() {
   const wrap = document.getElementById('view-workouts');
   wrap.innerHTML = '<div style="color:var(--muted);font-size:.88rem">Cargando...</div>';
-  const snap = await db.collection('workouts').where('trainerId', '==', S.user.uid).orderBy('createdAt', 'desc').get();
-  S.workouts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const snap = await db.collection('workouts').where('trainerId', '==', S.user.uid).get();
+  S.workouts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
 
   wrap.innerHTML = `
     <div class="page-header">
@@ -694,9 +698,10 @@ async function loadAssignments() {
   const wrap = document.getElementById('view-assignments');
   wrap.innerHTML = '<div style="color:var(--muted);font-size:.88rem">Cargando...</div>';
   const snap = await db.collection('assignments')
-    .where('trainerId', '==', S.user.uid)
-    .orderBy('scheduledDate', 'desc').limit(50).get();
-  S.assignments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    .where('trainerId', '==', S.user.uid).get();
+  S.assignments = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.scheduledDate || '').localeCompare(a.scheduledDate || ''))
+    .slice(0, 50);
 
   wrap.innerHTML = `
     <div class="page-header">
