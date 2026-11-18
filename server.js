@@ -33,6 +33,70 @@ http.createServer((req, res) => {
     return;
   }
 
+  if (req.url === '/api/strava/exchange' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      const { code } = JSON.parse(body);
+      const payload = JSON.stringify({
+        client_id: process.env.STRAVA_CLIENT_ID || '282302',
+        client_secret: process.env.STRAVA_CLIENT_SECRET || '',
+        code,
+        grant_type: 'authorization_code',
+      });
+      const opts = {
+        hostname: 'www.strava.com',
+        path: '/oauth/token',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+      };
+      const proxyReq = https.request(opts, proxyRes => {
+        let data = '';
+        proxyRes.on('data', c => { data += c; });
+        proxyRes.on('end', () => {
+          res.writeHead(proxyRes.statusCode, { 'content-type': 'application/json' });
+          res.end(data);
+        });
+      });
+      proxyReq.on('error', err => { res.writeHead(500); res.end(JSON.stringify({ error: err.message })); });
+      proxyReq.write(payload);
+      proxyReq.end();
+    });
+    return;
+  }
+
+  if (req.url === '/api/strava/refresh' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      const { refresh_token } = JSON.parse(body);
+      const payload = JSON.stringify({
+        client_id: process.env.STRAVA_CLIENT_ID || '282302',
+        client_secret: process.env.STRAVA_CLIENT_SECRET || '',
+        refresh_token,
+        grant_type: 'refresh_token',
+      });
+      const opts = {
+        hostname: 'www.strava.com',
+        path: '/oauth/token',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+      };
+      const proxyReq = https.request(opts, proxyRes => {
+        let data = '';
+        proxyRes.on('data', c => { data += c; });
+        proxyRes.on('end', () => {
+          res.writeHead(proxyRes.statusCode, { 'content-type': 'application/json' });
+          res.end(data);
+        });
+      });
+      proxyReq.on('error', err => { res.writeHead(500); res.end(JSON.stringify({ error: err.message })); });
+      proxyReq.write(payload);
+      proxyReq.end();
+    });
+    return;
+  }
+
   if (req.url === '/api/ai' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => { body += chunk; });

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ByronFit — Conectando Strava</title>
+  <link rel="icon" type="image/png" href="ByronFit.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="waiting-screen">
+    <img src="ByronFit.png" alt="ByronFit" style="height:70px;margin-bottom:1rem" />
+    <h2 id="status-title">Conectando con Strava...</h2>
+    <p id="status-msg">Espera un momento mientras procesamos tu autorización.</p>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <script src="config.js"></script>
+  <script>
+    firebase.initializeApp(FIREBASE_CONFIG);
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    function setStatus(title, msg, isError) {
+      document.getElementById('status-title').textContent = title;
+      document.getElementById('status-msg').textContent   = msg;
+      if (isError) document.getElementById('status-title').style.color = 'var(--red, #e53e3e)';
+    }
+
+    const params = new URLSearchParams(location.search);
+    const code   = params.get('code');
+    const error  = params.get('error');
+
+    if (error || !code) {
+      setStatus('Autorización cancelada', 'No se ha conectado Strava. Puedes intentarlo de nuevo desde la app.', true);
+      setTimeout(() => location.href = 'client.html', 2500);
+    } else {
+      auth.onAuthStateChanged(async user => {
+        if (!user) { location.href = 'login.html'; return; }
+        try {
+          const res  = await fetch('/api/strava/exchange', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code }),
+          });
+          const data = await res.json();
+          if (data.errors || !data.access_token) {
+            throw new Error(data.message || 'Error al intercambiar el código con Strava');
+          }
+          await db.collection('users').doc(user.uid).update({
+            stravaConnected:    true,
+            stravaAthleteId:    data.athlete?.id || '',
+            stravaAccessToken:  data.access_token,
+            stravaRefreshToken: data.refresh_token,
+            stravaTokenExpiry:  data.expires_at,
+          });
+          setStatus('¡Strava conectado!', 'Redirigiendo a la app...');
+          setTimeout(() => location.href = 'client.html', 1500);
+        } catch(err) {
+          setStatus('Error al conectar', err.message, true);
+          setTimeout(() => location.href = 'client.html', 3000);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

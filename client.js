@@ -109,10 +109,10 @@ async function loadToday() {
   const snap = await db.collection('assignments')
     .where('clientId', '==', S.user.uid)
     .where('scheduledDate', '==', t)
-    .where('status', '==', 'pending')
     .get();
+  const pendingDocs = snap.docs.filter(d => d.data().status === 'pending');
 
-  if (snap.empty) {
+  if (!pendingDocs.length) {
     content.innerHTML = `
       <div style="padding:2rem 0;text-align:center">
         <div style="font-size:1.1rem;font-weight:600;margin-bottom:.4rem">Sin entrenamiento hoy</div>
@@ -122,7 +122,7 @@ async function loadToday() {
     return;
   }
 
-  const assignment = { id: snap.docs[0].id, ...snap.docs[0].data() };
+  const assignment = { id: pendingDocs[0].id, ...pendingDocs[0].data() };
   const workoutSnap = await db.collection('workouts').doc(assignment.workoutId).get();
   if (!workoutSnap.exists) {
     content.innerHTML = '<div style="color:var(--red)">Error: entrenamiento no encontrado.</div>';
@@ -248,12 +248,12 @@ async function loadPlan() {
 
   const snap = await db.collection('assignments')
     .where('clientId', '==', S.user.uid)
-    .where('scheduledDate', '>=', today())
-    .orderBy('scheduledDate', 'asc')
-    .limit(30)
     .get();
 
-  const assignments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const assignments = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .filter(a => a.scheduledDate >= today())
+    .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate))
+    .slice(0, 30);
 
   if (!assignments.length) {
     content.innerHTML = `
@@ -309,30 +309,49 @@ async function openPlanDetail(workoutId, assignmentId, scheduledDate) {
 /* ══════════════════════════════════════════
    HISTORY
 ══════════════════════════════════════════ */
-async function loadHistory() {
+async function loadHistory(tab) {
+  tab = tab || 'sessions';
   const content = document.getElementById('client-content');
   content.innerHTML = '<div style="color:var(--muted);font-size:.88rem;padding:.5rem 0">Cargando...</div>';
 
   const snap = await db.collection('sessions')
     .where('clientId', '==', S.user.uid)
-    .orderBy('completedAt', 'desc')
-    .limit(30)
     .get();
+  S.sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.completedAt?.toMillis?.() || 0) - (a.completedAt?.toMillis?.() || 0))
+    .slice(0, 30);
 
-  S.sessions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const stravaConnected = S.userData?.stravaConnected || false;
 
+  content.innerHTML = `
+    <h2 style="margin-bottom:.75rem">Historial</h2>
+    <div class="history-tabs">
+      <button class="history-tab ${tab === 'sessions' ? 'active' : ''}" onclick="loadHistory('sessions')">Sesiones</button>
+      <button class="history-tab ${tab === 'strava' ? 'active' : ''}" onclick="loadHistory('strava')">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;margin-right:3px"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+        Strava
+      </button>
+    </div>
+    <div id="history-tab-content"></div>`;
+
+  if (tab === 'sessions') {
+    renderSessionsTab();
+  } else {
+    await renderStravaTab(stravaConnected);
+  }
+}
+
+function renderSessionsTab() {
+  const el = document.getElementById('history-tab-content');
   if (!S.sessions.length) {
-    content.innerHTML = `
-      <h2 style="margin-bottom:1rem">Historial</h2>
+    el.innerHTML = `
       <div class="empty-state">
         <div class="empty-title">Sin sesiones completadas</div>
         <div class="empty-sub">Cuando completes un entrenamiento aparecerá aquí.</div>
       </div>`;
     return;
   }
-
-  content.innerHTML = `
-    <h2 style="margin-bottom:1rem">Historial</h2>
+  el.innerHTML = `
     <div class="history-list">
       ${S.sessions.map(s => `
         <div class="history-item">
@@ -344,6 +363,141 @@ async function loadHistory() {
           <div class="history-item-rpe">RPE ${s.rpe || '—'}</div>
         </div>`).join('')}
     </div>`;
+}
+
+async function renderStravaTab(connected) {
+  const el = document.getElementById('history-tab-content');
+  if (!connected) {
+    el.innerHTML = `
+      <div class="strava-connect-box">
+        <svg class="strava-logo-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+        <div class="strava-connect-title">Conecta Strava</div>
+        <div class="strava-connect-sub">Vincula tu cuenta de Strava para ver tus actividades directamente en ByronFit.</div>
+        <button class="strava-btn" onclick="connectStrava()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>
+          Conectar con Strava
+        </button>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = '<div style="color:var(--muted);font-size:.88rem;padding:.5rem 0">Cargando actividades...</div>';
+  try {
+    const token = await getValidStravaToken();
+    if (!token) {
+      S.userData.stravaConnected = false;
+      el.innerHTML = `<div style="font-size:.88rem;color:var(--muted)">Sesión de Strava expirada.
+        <button class="btn btn-ghost btn-sm" style="margin-left:.5rem" onclick="connectStrava()">Reconectar</button></div>`;
+      return;
+    }
+    const res = await fetch('https://www.strava.com/api/v3/athlete/activities?per_page=20', {
+      headers: { 'Authorization': 'Bearer ' + token },
+    });
+    if (!res.ok) throw new Error('Error ' + res.status);
+    const activities = await res.json();
+    if (!activities.length) {
+      el.innerHTML = `<div class="empty-state"><div class="empty-title">Sin actividades</div>
+        <div class="empty-sub">No hay actividades recientes en Strava.</div></div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="strava-activities">
+        ${activities.map(a => renderStravaActivity(a)).join('')}
+      </div>
+      <div style="text-align:right;margin-top:.75rem">
+        <button class="btn btn-ghost btn-sm" onclick="disconnectStrava()">Desconectar Strava</button>
+      </div>`;
+  } catch(err) {
+    el.innerHTML = `<div style="color:var(--red);font-size:.88rem">Error al cargar actividades: ${err.message}</div>`;
+  }
+}
+
+function renderStravaActivity(a) {
+  const dist     = a.distance     ? (a.distance / 1000).toFixed(2) + ' km' : '';
+  const duration = a.moving_time  ? fmtDuration(a.moving_time)             : '';
+  const elev     = a.total_elevation_gain ? Math.round(a.total_elevation_gain) + ' m D+' : '';
+  const date     = a.start_date_local
+    ? new Date(a.start_date_local).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+    : '';
+  const icon = stravaTypeIcon(a.sport_type || a.type);
+  return `
+    <div class="strava-activity-item">
+      <div class="strava-activity-icon">${icon}</div>
+      <div class="strava-activity-body">
+        <div class="strava-activity-name">${a.name}</div>
+        <div class="strava-activity-meta">${[dist, duration, elev].filter(Boolean).join(' · ')}</div>
+      </div>
+      <div class="strava-activity-date">${date}</div>
+    </div>`;
+}
+
+function stravaTypeIcon(type) {
+  const map = {
+    Run: '🏃', VirtualRun: '🏃', TrailRun: '🏃',
+    Ride: '🚴', VirtualRide: '🚴', EBikeRide: '🚴', GravelRide: '🚴',
+    Swim: '🏊', Walk: '🚶', Hike: '🥾',
+    WeightTraining: '🏋️', Workout: '💪', CrossFit: '💪',
+    Yoga: '🧘', Pilates: '🧘',
+  };
+  return map[type] || '⚡';
+}
+
+function fmtDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function connectStrava() {
+  const p = new URLSearchParams({
+    client_id:       '282302',
+    redirect_uri:    'https://byronfit.onrender.com/strava-callback.html',
+    response_type:   'code',
+    approval_prompt: 'auto',
+    scope:           'activity:read_all',
+  });
+  location.href = 'https://www.strava.com/oauth/authorize?' + p;
+}
+
+async function disconnectStrava() {
+  try {
+    await db.collection('users').doc(S.user.uid).update({
+      stravaConnected: false, stravaAccessToken: '', stravaRefreshToken: '', stravaTokenExpiry: 0,
+    });
+    S.userData.stravaConnected = false;
+    loadHistory('strava');
+  } catch(err) { toast('Error: ' + err.message); }
+}
+
+async function getValidStravaToken() {
+  try {
+    const snap = await db.collection('users').doc(S.user.uid).get();
+    const data = snap.data();
+    if (!data.stravaConnected) return null;
+    const now = Math.floor(Date.now() / 1000);
+    if (data.stravaTokenExpiry > now + 300) return data.stravaAccessToken;
+    const res = await fetch('/api/strava/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: data.stravaRefreshToken }),
+    });
+    const refreshed = await res.json();
+    if (!refreshed.access_token) return null;
+    await db.collection('users').doc(S.user.uid).update({
+      stravaAccessToken:  refreshed.access_token,
+      stravaRefreshToken: refreshed.refresh_token,
+      stravaTokenExpiry:  refreshed.expires_at,
+    });
+    Object.assign(S.userData, {
+      stravaAccessToken:  refreshed.access_token,
+      stravaRefreshToken: refreshed.refresh_token,
+      stravaTokenExpiry:  refreshed.expires_at,
+    });
+    return refreshed.access_token;
+  } catch { return null; }
 }
 
 /* ══════════════════════════════════════════

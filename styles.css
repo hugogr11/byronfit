@@ -647,3 +647,56 @@ input[type="range"] { padding: 0; border: none; background: transparent; cursor:
 }
 .waiting-screen h2 { font-size: 1.3rem; font-weight: 600; }
 .waiting-screen p  { color: var(--muted2); font-size: .9rem; max-width: 320px; }
+
+/* ── History tabs ───────────────────────────────── */
+.history-tabs {
+  display: flex; gap: .35rem; margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: .1rem;
+}
+.history-tab {
+  background: none; border: none; cursor: pointer;
+  font-family: inherit; font-size: .88rem; font-weight: 500;
+  color: var(--muted2); padding: .4rem .75rem .55rem;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color .15s, border-color .15s;
+  display: flex; align-items: center; gap: .25rem;
+}
+.history-tab:hover  { color: var(--text); }
+.history-tab.active { color: var(--text); border-bottom-color: var(--text); }
+
+/* ── Strava connect box ─────────────────────────── */
+.strava-connect-box {
+  display: flex; flex-direction: column; align-items: center;
+  gap: .75rem; padding: 2rem 1rem; text-align: center;
+}
+.strava-logo-icon { width: 44px; height: 44px; color: #fc4c02; }
+.strava-connect-title { font-size: 1.05rem; font-weight: 600; }
+.strava-connect-sub   { font-size: .875rem; color: var(--muted2); max-width: 280px; }
+
+/* ── Strava button ──────────────────────────────── */
+.strava-btn {
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: #fc4c02; color: #fff;
+  border: none; border-radius: var(--r-lg);
+  padding: .65rem 1.25rem; font-family: inherit;
+  font-size: .9rem; font-weight: 600; cursor: pointer;
+  transition: opacity .15s;
+}
+.strava-btn:hover { opacity: .88; }
+
+/* ── Strava activity list ───────────────────────── */
+.strava-activities { display: flex; flex-direction: column; gap: .5rem; }
+.strava-activity-item {
+  display: flex; align-items: center; gap: .85rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: .75rem 1rem;
+}
+.strava-activity-icon { font-size: 1.3rem; flex-shrink: 0; }
+.strava-activity-body { flex: 1; min-width: 0; }
+.strava-activity-name {
+  font-weight: 500; font-size: .9375rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.strava-activity-meta { font-size: .8rem; color: var(--muted2); margin-top: .1rem; }
+.strava-activity-date { font-size: .775rem; color: var(--muted); flex-shrink: 0; }
