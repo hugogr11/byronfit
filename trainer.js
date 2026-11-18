@@ -657,9 +657,21 @@ function renderBlocksReadonly(blocks) {
 ══════════════════════════════════════════ */
 async function openAssignModal(workoutId, workoutTitle) {
   document.getElementById('assign-workout-id').value = workoutId;
-  // Load clients into select
   const clientsSnap = await db.collection('clients').where('trainerId', '==', S.user.uid).get();
   const clients = clientsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  // Auto-link any client who registered but whose clientId wasn't saved
+  for (const c of clients) {
+    if (!c.clientId) {
+      const usersSnap = await db.collection('users').where('email', '==', c.email).get();
+      if (!usersSnap.empty) {
+        const uid = usersSnap.docs[0].id;
+        await db.collection('clients').doc(c.id).update({ clientId: uid });
+        c.clientId = uid;
+      }
+    }
+  }
+
   const sel = document.getElementById('assign-client');
   sel.innerHTML = clients.length
     ? clients.map(c => `<option value="${c.clientId || ''}" data-name="${c.name}">${c.name}${!c.clientId ? ' (pendiente registro)' : ''}</option>`).join('')
