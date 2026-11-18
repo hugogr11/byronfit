@@ -151,7 +151,14 @@
         const userData = { name, email, role, goal, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
         if (!isTrainer && pending.exists) userData.trainerId = pending.data().trainerId;
         await db.collection('users').doc(cred.user.uid).set(userData);
-        if (!isTrainer && pending.exists) await db.collection('pendingClients').doc(email).delete();
+        if (!isTrainer && pending.exists) {
+          await db.collection('pendingClients').doc(email).delete();
+          // Link the clients record with the new UID
+          const clientsSnap = await db.collection('clients').where('email', '==', email).get();
+          for (const doc of clientsSnap.docs) {
+            await doc.ref.update({ clientId: cred.user.uid });
+          }
+        }
         redirectByRole(role);
       } catch(err) {
         const msgs = {
